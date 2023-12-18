@@ -2,3 +2,4 @@ streamlit
 pandas
 bokeh=2.4.3
 influxdb3-python
+streamlit_bokeh_events
