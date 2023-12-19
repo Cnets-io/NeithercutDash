@@ -11,7 +11,7 @@ from influxdb_client_3 import InfluxDBClient3
 
 
 # Instantiate an InfluxDB client configured for a bucket
-@st.cache_resource
+#@st.cache_resource
 def getDataFrame():
     client = InfluxDBClient3(
     "https://us-east-1-1.aws.cloud2.influxdata.com",
