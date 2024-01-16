@@ -5,7 +5,7 @@ from bokeh.io import show
 
 import pandas as pd
 import streamlit as st
-from influxdb_client_3 import InfluxDBClient3
+from influxdb_client import InfluxDBClient, Point
 
 
 
@@ -13,23 +13,21 @@ from influxdb_client_3 import InfluxDBClient3
 # Instantiate an InfluxDB client configured for a bucket
 #@st.cache_resource
 def getDataFrame():
-    client = InfluxDBClient3(
-    "https://us-east-1-1.aws.cloud2.influxdata.com",
-    database="Neithercut",
-    token=st.secrets['INFLUXDB_KEY'])
+    client = InfluxDBClient(
+    "http://141.148.21.97:8086",
+    database="neithercut",
+    token=st.secrets['INFLUXDB_KEY'],
+    org='cnets')
+    query_api = client.query_api()
 
     # Execute the query to retrieve all record batches in the stream
     # formatted as a PyArrow Table.
-    table = client.query(
-    '''SELECT * 
-    FROM "mqtt_consumer"
-    WHERE
-    time >= now() - interval '30 days'
-    ORDER BY time DESC'''
-    )
+
+    table = query_api.query_data_frame('from(bucket:"neithercut") |> range(start: -30d)')
     client.close()
+
     # Convert the PyArrow Table to a pandas DataFrame.
-    dataframe = table.to_pandas()
+    dataframe = table
     dataframe['local_time'] = dataframe['time'].dt.tz_localize('utc').dt.tz_convert('America/Detroit')
     dataframe['local_time'] = dataframe['local_time'].dt.tz_localize(None)
     dataframe['avg_temperature'] = (dataframe.object_air_temperature_value + dataframe.object_barometer_temperature_value + dataframe.object_co2_sensor_temperature_value) / 3
