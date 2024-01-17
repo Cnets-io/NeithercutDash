@@ -50,7 +50,7 @@ from(bucket:"neithercut")
         measurements.append(new_row)
     
     dfR = pd.DataFrame(measurements)
-    dfR = dfR.set_index('local_time')
+    #dfR = dfR.set_index('local_time')
     dfR['avg_temperature'] = (dfR.object_air_temperature_value + dfR.object_barometer_temperature_value ) / 2
     dfR.drop_duplicates(inplace=True) 
     return dfR
