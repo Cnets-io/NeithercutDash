@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 from influxdb_client import InfluxDBClient, Point
 
-idbtoken = st.secrets['INFLUXDB_KEY'])
+idbtoken = st.secrets['INFLUXDB_KEY']
 
 
 # Instantiate an InfluxDB client configured for a bucket
