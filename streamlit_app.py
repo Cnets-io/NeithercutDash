@@ -7,7 +7,7 @@ import pandas as pd
 import streamlit as st
 from influxdb_client import InfluxDBClient, Point
 
-
+idbtoken = st.secrets['INFLUXDB_KEY'])
 
 
 # Instantiate an InfluxDB client configured for a bucket
@@ -16,27 +16,49 @@ def getDataFrame():
     client = InfluxDBClient(
     "http://141.148.21.97:8086",
     database="neithercut",
-    token=st.secrets['INFLUXDB_KEY'],
+    token = idbtoken,
     org='cnets')
-    query_api = client.query_api()
 
-    # Execute the query to retrieve all record batches in the stream
-    # formatted as a PyArrow Table.
 
-    table = query_api.query_data_frame('from(bucket:"neithercut") |> range(start: -30d)')
+    query = '''
+from(bucket:"neithercut") 
+  |> range(start: -30d, stop: now()) 
+  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+  |> filter(fn: (r) => r["_measurement"] == "device_frmpayload_data_air_humidity_value" or 
+    r["_measurement"] == "device_frmpayload_data_co2_concentration_lpf_value" or 
+    r["_measurement"] == "device_frmpayload_data_air_temperature_value" or 
+    r["_measurement"] == "device_frmpayload_data_barometer_temperature_value" or 
+    r["_measurement"] == "device_frmpayload_data_co2_sensor_temperature_value" or
+    r["_measurement"] == "device_frmpayload_data_barometric_pressure_value")
+  |> keep(columns: ["_time", "_measurement", "device_name", "value"])
+    '''
+    dataframe = client.query_api().query_data_frame(query)
     client.close()
-
-    # Convert the PyArrow Table to a pandas DataFrame.
-    dataframe = table
-    dataframe['local_time'] = dataframe['time'].dt.tz_localize('utc').dt.tz_convert('America/Detroit')
-    dataframe['local_time'] = dataframe['local_time'].dt.tz_localize(None)
-    dataframe['avg_temperature'] = (dataframe.object_air_temperature_value + dataframe.object_barometer_temperature_value + dataframe.object_co2_sensor_temperature_value) / 3
-    return dataframe
+    dataframe['local_time'] = dataframe['_time'].dt.tz_convert('America/Detroit')
+    
+    measurements = []
+    for timestamp in dataframe.local_time:
+        values = dataframe[ dataframe.local_time == timestamp ]
+        new_row = {'local_time': timestamp,
+                   'object_device_id' : values["device_name"].iloc[0],
+                   'object_air_humidity_value' : float(values[ values["_measurement"] == "device_frmpayload_data_air_humidity_value"]["value"].iloc[0]),
+                   'object_air_temperature_value' : float(values[ values["_measurement"] == "device_frmpayload_data_air_temperature_value"]["value"].iloc[0]),
+                   'object_barometric_pressure_value' : float(values[ values["_measurement"] == "device_frmpayload_data_barometric_pressure_value"]["value"].iloc[0]),
+                   'object_barometer_temperature_value' : float(values[ values["_measurement"] == "device_frmpayload_data_barometer_temperature_value"]["value"].iloc[0]),
+                   'object_co2_concentration_lpf_value' : float(values[ values["_measurement"] == "device_frmpayload_data_co2_concentration_lpf_value"]["value"].iloc[0])
+                  }
+        measurements.append(new_row)
+    
+    dfR = pd.DataFrame(measurements)
+    dfR = dfR.set_index('local_time')
+    dfR['avg_temperature'] = (dfR.object_air_temperature_value + dfR.object_barometer_temperature_value ) / 2
+    dfR.drop_duplicates(inplace=True) 
+    return dfR
 
 
 dataframe = getDataFrame()
-dfInside = dataframe[dataframe.object_device_id == 1541]
-dfOutside = dataframe[dataframe.object_device_id == 1542]
+dfInside = dataframe[dataframe.object_device_id == "1541"]
+dfOutside = dataframe[dataframe.object_device_id == "1542"]
 
 
 st.write("# Neithercut 30-Day Data Window")
